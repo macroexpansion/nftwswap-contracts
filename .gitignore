@@ -1,0 +1,8 @@
+node_modules
+build
+dist
+cache
+.secret
+
+artifacts/*
+!artifacts/contracts
