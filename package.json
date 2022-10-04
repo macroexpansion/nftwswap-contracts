@@ -20,12 +20,14 @@
         "hardhat": "^2.11.2",
         "hardhat-gas-reporter": "^1.0.9",
         "prettier": "^2.7.1",
+        "prettier-plugin-solidity": "^1.0.0-beta.24",
         "solidity-coverage": "^0.8.2",
         "typechain": "^8.1.0"
     },
     "scripts": {
         "compile": "hardhat compile",
         "clean": "rm -rf artifacts",
-        "fmt": "prettier --write ."
+        "fmt": "prettier --write .",
+        "fmt:sol": "prettier --write **/*.sol"
     }
 }

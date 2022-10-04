@@ -11,22 +11,11 @@ module.exports = {
     defaultNetwork: 'hardhat',
     networks: {
         hardhat: {},
-        /* bsc_testnet: {
-            url: 'https://data-seed-prebsc-1-s1.binance.org:8545',
-            chainId: 97,
-            gasPrice: 20000000000,
-            accounts: [
-                process.env.TESTNET_PK,
-            ],
+        ethw_mainnet: {
+            url: 'http://mainnet.ethereumpow.org',
+            chainId: 10001,
+            accounts: [process.env.MAINNET_PK ?? process.env.TESTNET_PK],
         },
-        bsc_mainnet: {
-            url: 'https://bsc-dataseed.binance.org/',
-            chainId: 56,
-            gasPrice: 20000000000,
-            accounts: [
-                process.env.MAINNEET_PK ?? process.env.TESTNET_PK
-            ],
-        }, */
     },
     mocha: {
         timeout: 20000,

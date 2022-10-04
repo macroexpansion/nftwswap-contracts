@@ -19,18 +19,28 @@ describe('NFT', () => {
         this.NFT = new ethers.Contract(
             nftDeploy.address,
             this.nftAbi,
-            this.signers[0]
+            this.signers[1]
         )
     })
 
-    it('mint once', async () => {
+    it('mint 1', async () => {
         const minted = await this.NFT.safeMint(this.signers[0].address, 'url')
         await minted.wait()
 
         const balance = await this.NFT.balanceOf(this.signers[0].address)
         expect(balance.toString()).to.equal('1')
+    })
 
-        for (let i = 0; i < balance; i++) {
+    it('mint 2', async () => {
+        const minted = await this.NFT.safeMint(this.signers[0].address, 'url')
+        await minted.wait()
+
+        const balance = await this.NFT.balanceOf(this.signers[0].address)
+        expect(balance.toString()).to.equal('2')
+    })
+
+    it('check uri', async () => {
+        for (let i = 0; i < 2; i++) {
             const tokenId = await this.NFT.tokenOfOwnerByIndex(
                 this.signers[0].address,
                 i
