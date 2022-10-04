@@ -1,4 +1,4 @@
 {
-    "test": "test",
-    "nftAddress": "0x50b49fed58eAD9476Ed99D007E9c91112092D264"
+    "nftAddress": "0x50b49fed58eAD9476Ed99D007E9c91112092D264",
+    "marketplaceAddress": "0xF65912AAb31344b05199f64f1368177268BF9510"
 }
