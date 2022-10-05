@@ -4,7 +4,7 @@ const fs = require('fs')
 const deploy = async () => {
     const [signer, Market] = await Promise.all([
         ethers.getSigner(),
-        ethers.getContractFactory('Marketplace'),
+        ethers.getContractFactory('NFTMarketplace'),
     ])
     const market = await Market.deploy(signer.address, 50)
     await market.deployed()
