@@ -6,6 +6,8 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
+import 'hardhat/console.sol';
+
 interface IKuiperNFTFactory {
     function createNFTCollection(
         string memory _name,
@@ -212,7 +214,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     }
 
     // @notice List NFT on Marketplace
-    function listNft(
+    function listItem(
         address _nft,
         uint256 _tokenId,
         address _payToken,
@@ -235,7 +237,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     }
 
     // @notice Cancel listed NFT
-    function cancelListedNFT(address _nft, uint256 _tokenId)
+    function cancelListedItem(address _nft, uint256 _tokenId)
         external
         isListedNFT(_nft, _tokenId)
     {
@@ -246,11 +248,10 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     }
 
     // @notice Buy listed NFT
-    function buyNFT(
+    function buyItem(
         address _nft,
         uint256 _tokenId,
-        address _payToken,
-        uint256 _price
+        address _payToken
     ) external isListedNFT(_nft, _tokenId) {
         ListNFT storage listedNft = listNfts[_nft][_tokenId];
         require(
@@ -258,29 +259,13 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
             'invalid pay token'
         );
         require(!listedNft.sold, 'nft already sold');
-        require(_price >= listedNft.price, 'invalid price');
 
         listedNft.sold = true;
 
-        uint256 totalPrice = _price;
-        IKuiperNFT nft = IKuiperNFT(listedNft.nft);
-        address royaltyRecipient = nft.getRoyaltyRecipient();
-        uint256 royaltyFee = nft.getRoyaltyFee();
-
-        if (royaltyFee > 0) {
-            uint256 royaltyTotal = calculateRoyalty(royaltyFee, _price);
-
-            // Transfer royalty fee to collection owner
-            IERC20(listedNft.payToken).transferFrom(
-                msg.sender,
-                royaltyRecipient,
-                royaltyTotal
-            );
-            totalPrice -= royaltyTotal;
-        }
+        uint256 totalPrice = listedNft.price;
 
         // Calculate & Transfer platfrom fee
-        uint256 platformFeeTotal = calculatePlatformFee(_price);
+        uint256 platformFeeTotal = calculatePlatformFee(listedNft.price);
         IERC20(listedNft.payToken).transferFrom(
             msg.sender,
             feeRecipient,
@@ -305,7 +290,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
             listedNft.nft,
             listedNft.tokenId,
             listedNft.payToken,
-            _price,
+            listedNft.price,
             listedNft.seller,
             msg.sender
         );
@@ -486,7 +471,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     }
 
     // @notice Bid place auction
-    function bidPlace(
+    function bidAuction(
         address _nft,
         uint256 _tokenId,
         uint256 _bidPrice
@@ -534,10 +519,10 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
                 msg.sender == auctionNfts[_nft][_tokenId].lastBidder,
             'not creator, winner, or owner'
         );
-        require(
-            block.timestamp > auctionNfts[_nft][_tokenId].endTime,
-            'auction not ended'
-        );
+        // require(
+        //     block.timestamp > auctionNfts[_nft][_tokenId].endTime,
+        //     'auction not ended'
+        // );
 
         AuctionNFT storage auction = auctionNfts[_nft][_tokenId];
         IERC20 payToken = IERC20(auction.payToken);
@@ -546,20 +531,8 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         auction.success = true;
         auction.winner = auction.creator;
 
-        IKuiperNFT kuiperNft = IKuiperNFT(_nft);
-        address royaltyRecipient = kuiperNft.getRoyaltyRecipient();
-        uint256 royaltyFee = kuiperNft.getRoyaltyFee();
-
         uint256 heighestBid = auction.heighestBid;
         uint256 totalPrice = heighestBid;
-
-        if (royaltyFee > 0) {
-            uint256 royaltyTotal = calculateRoyalty(royaltyFee, heighestBid);
-
-            // Transfer royalty fee to collection owner
-            payToken.transfer(royaltyRecipient, royaltyTotal);
-            totalPrice -= royaltyTotal;
-        }
 
         // Calculate & Transfer platfrom fee
         uint256 platformFeeTotal = calculatePlatformFee(heighestBid);
@@ -597,7 +570,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         return (_price * _royalty) / 10000;
     }
 
-    function getListedNFT(address _nft, uint256 _tokenId)
+    function getListedItem(address _nft, uint256 _tokenId)
         public
         view
         returns (ListNFT memory)
