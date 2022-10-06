@@ -8,20 +8,6 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 import 'hardhat/console.sol';
 
-interface IKuiperNFTFactory {
-    function createNFTCollection(
-        string memory _name,
-        string memory _symbol,
-        uint256 _royaltyFee
-    ) external;
-}
-
-interface IKuiperNFT {
-    function getRoyaltyFee() external view returns (uint256);
-
-    function getRoyaltyRecipient() external view returns (address);
-}
-
 /* NFT Marketplace
     List NFT, 
     Buy NFT, 
@@ -32,13 +18,13 @@ interface IKuiperNFT {
     & support Royalty
 */
 contract NFTMarketplace is Ownable, ReentrancyGuard {
-    uint256 private platformFee;
-    address private feeRecipient;
+    uint256 platformFee;
+    address payable feeRecipient;
 
     struct ListNFT {
         address nft;
         uint256 tokenId;
-        address seller;
+        address payable seller;
         address payToken;
         uint256 price;
         bool sold;
@@ -98,7 +84,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         uint256 indexed tokenId,
         address payToken,
         uint256 price,
-        address seller,
+        address payable seller,
         address indexed buyer
     );
     event OfferredNFT(
@@ -121,7 +107,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         address payToken,
         uint256 offerPrice,
         address offerer,
-        address indexed nftOwner
+        address payable indexed nftOwner
     );
     event CreatedAuction(
         address indexed nft,
@@ -131,26 +117,26 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         uint256 minBid,
         uint256 startTime,
         uint256 endTime,
-        address indexed creator
+        address payable indexed creator
     );
     event PlacedBid(
         address indexed nft,
         uint256 indexed tokenId,
         address payToken,
         uint256 bidPrice,
-        address indexed bidder
+        address payable indexed bidder
     );
 
     event ResultedAuction(
         address indexed nft,
         uint256 indexed tokenId,
-        address creator,
+        address payable creator,
         address indexed winner,
         uint256 price,
         address caller
     );
 
-    constructor(address _feeRecipient, uint256 _platformFee) {
+    constructor(address payable _feeRecipient, uint256 _platformFee) {
         require(_platformFee <= 10000, "can't more than 10 percent");
         feeRecipient = _feeRecipient;
         platformFee = _platformFee;
@@ -207,7 +193,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
 
     modifier isPayableToken(address _payToken) {
         require(
-            _payToken != address(0) && payableToken[_payToken],
+            _payToken == address(0) || payableToken[_payToken],
             'invalid pay token'
         );
         _;
@@ -227,7 +213,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         listNfts[_nft][_tokenId] = ListNFT({
             nft: _nft,
             tokenId: _tokenId,
-            seller: msg.sender,
+            seller: payable(msg.sender),
             payToken: _payToken,
             price: _price,
             sold: false
@@ -248,36 +234,36 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     }
 
     // @notice Buy listed NFT
-    function buyItem(
-        address _nft,
-        uint256 _tokenId,
-        address _payToken
-    ) external isListedNFT(_nft, _tokenId) {
+    function buyItem(address _nft, uint256 _tokenId)
+        external
+        payable
+        isListedNFT(_nft, _tokenId)
+    {
         ListNFT storage listedNft = listNfts[_nft][_tokenId];
-        require(
-            _payToken != address(0) && _payToken == listedNft.payToken,
-            'invalid pay token'
-        );
         require(!listedNft.sold, 'nft already sold');
 
         listedNft.sold = true;
-
         uint256 totalPrice = listedNft.price;
+        uint256 platformFeeTotal = calculatePlatformFee(totalPrice);
 
         // Calculate & Transfer platfrom fee
-        uint256 platformFeeTotal = calculatePlatformFee(listedNft.price);
-        IERC20(listedNft.payToken).transferFrom(
-            msg.sender,
-            feeRecipient,
-            platformFeeTotal
-        );
-
-        // Transfer to nft owner
-        IERC20(listedNft.payToken).transferFrom(
-            msg.sender,
-            listedNft.seller,
-            totalPrice - platformFeeTotal
-        );
+        if (listedNft.payToken == address(0)) {
+            require(msg.value >= listedNft.price, 'buyItem: incorrect price');
+            feeRecipient.transfer(platformFeeTotal);
+            listedNft.seller.transfer(totalPrice - platformFeeTotal);
+        } else {
+            IERC20(listedNft.payToken).transferFrom(
+                msg.sender,
+                feeRecipient,
+                platformFeeTotal
+            );
+            // Transfer to nft owner
+            IERC20(listedNft.payToken).transferFrom(
+                msg.sender,
+                listedNft.seller,
+                totalPrice - platformFeeTotal
+            );
+        }
 
         // Transfer NFT to buyer
         IERC721(listedNft.nft).safeTransferFrom(
@@ -373,20 +359,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
 
         uint256 offerPrice = offer.offerPrice;
         uint256 totalPrice = offerPrice;
-
-        IKuiperNFT nft = IKuiperNFT(offer.nft);
-        address royaltyRecipient = nft.getRoyaltyRecipient();
-        uint256 royaltyFee = nft.getRoyaltyFee();
-
         IERC20 payToken = IERC20(offer.payToken);
-
-        if (royaltyFee > 0) {
-            uint256 royaltyTotal = calculateRoyalty(royaltyFee, offerPrice);
-
-            // Transfer royalty fee to collection owner
-            payToken.transfer(royaltyRecipient, royaltyTotal);
-            totalPrice -= royaltyTotal;
-        }
 
         // Calculate & Transfer platfrom fee
         uint256 platformFeeTotal = calculatePlatformFee(offerPrice);
@@ -451,7 +424,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
             _minBid,
             _startTime,
             _endTime,
-            msg.sender
+            payable(msg.sender)
         );
     }
 
@@ -507,7 +480,13 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         auction.lastBidder = msg.sender;
         auction.heighestBid = _bidPrice;
 
-        emit PlacedBid(_nft, _tokenId, auction.payToken, _bidPrice, msg.sender);
+        emit PlacedBid(
+            _nft,
+            _tokenId,
+            auction.payToken,
+            _bidPrice,
+            payable(msg.sender)
+        );
     }
 
     // @notice Result auction, can call by auction creator, heighest bidder, or marketplace owner only!
@@ -547,7 +526,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         emit ResultedAuction(
             _nft,
             _tokenId,
-            auction.creator,
+            payable(auction.creator),
             auction.lastBidder,
             auction.heighestBid,
             msg.sender
@@ -602,7 +581,10 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         platformFee = _platformFee;
     }
 
-    function changeFeeRecipient(address _feeRecipient) external onlyOwner {
+    function changeFeeRecipient(address payable _feeRecipient)
+        external
+        onlyOwner
+    {
         require(_feeRecipient != address(0), "can't be 0 address");
         feeRecipient = _feeRecipient;
     }

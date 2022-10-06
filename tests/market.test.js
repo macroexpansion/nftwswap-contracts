@@ -57,7 +57,7 @@ describe('Market', () => {
     })
 
     it('mint nft', async () => {
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
             const minted = await this.NFT.safeMint(this.seller.address, 'url')
             await minted.wait()
 
@@ -67,7 +67,7 @@ describe('Market', () => {
     })
 
     it('approve nft for market', async () => {
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
             const approved = await this.NFT.approve(this.Market.address, i)
             await approved.wait()
             const address = await this.NFT.getApproved(i)
@@ -114,11 +114,7 @@ describe('Market', () => {
         await approved.wait()
 
         const market = await this.Market.connect(this.buyer)
-        const bought = await market.buyItem(
-            this.NFT.address,
-            0,
-            this.Token.address
-        )
+        const bought = await market.buyItem(this.NFT.address, 0)
         await bought.wait()
 
         const balance = await this.Token.balanceOf(this.seller.address)
@@ -180,4 +176,53 @@ describe('Market', () => {
         const numNft = await this.NFT.balanceOf(this.buyer.address)
         expect(numNft.toString()).to.equal('2')
     })
+
+    it('list nft with native token', async () => {
+        const market = await this.Market.connect(this.seller)
+        const listed = await this.Market.listItem(
+            this.NFT.address,
+            3,
+            '0x0000000000000000000000000000000000000000',
+            ethers.utils.parseEther('1')
+        )
+        await listed.wait()
+
+        const listedNft = await this.Market.getListedItem(this.NFT.address, 3)
+        expect(listedNft.nft).to.equal(this.NFT.address)
+        expect(listedNft.tokenId).to.equal(3)
+        expect(listedNft.seller).to.equal(this.seller.address)
+        expect(listedNft.payToken).to.equal(
+            '0x0000000000000000000000000000000000000000'
+        )
+        expect(listedNft.price.toString()).to.equal(
+            ethers.utils.parseEther('1')
+        )
+        expect(listedNft.sold).to.equal(false)
+    })
+
+    it('buy nft with native token', async () => {
+        const market = await this.Market.connect(this.buyer)
+        const bought = await market.buyItem(this.NFT.address, 3, {
+            value: ethers.utils.parseEther('1'),
+        })
+        await bought.wait()
+
+        /* const balance = await ethers.provider.getBalance(this.seller.address)
+        expect(balance.toString()).to.equal('10000989073563242218084') */
+
+        const numNft = await this.NFT.balanceOf(this.buyer.address)
+        expect(numNft.toString()).to.equal('3')
+    })
+
+    /* it('create auction with native token', async () => {
+
+	})
+
+	it('bid auction with native token', async () => {
+
+	})
+
+	it('result auction with native token', async () => {
+
+	}) */
 })
