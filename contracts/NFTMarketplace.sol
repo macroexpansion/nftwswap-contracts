@@ -18,6 +18,8 @@ import 'hardhat/console.sol';
     & support Royalty
 */
 contract NFTMarketplace is Ownable, ReentrancyGuard {
+    receive() external payable {}
+
     uint256 platformFee;
     address payable feeRecipient;
 
@@ -42,13 +44,13 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     struct AuctionNFT {
         address nft;
         uint256 tokenId;
-        address creator;
+        address payable creator;
         address payToken;
         uint256 initialPrice;
         uint256 minBid;
         uint256 startTime;
         uint256 endTime;
-        address lastBidder;
+        address payable lastBidder;
         uint256 heighestBid;
         address winner;
         bool success;
@@ -64,7 +66,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => mapping(address => OfferNFT)))
         private offerNfts;
 
-    // nft => tokenId => acuton struct
+    // nft => tokenId => auction struct
     mapping(address => mapping(uint256 => AuctionNFT)) private auctionNfts;
 
     // auciton index => bidding counts => bidder address => bid price
@@ -124,7 +126,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         uint256 indexed tokenId,
         address payToken,
         uint256 bidPrice,
-        address payable indexed bidder
+        address indexed bidder
     );
 
     event ResultedAuction(
@@ -404,13 +406,13 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         auctionNfts[_nft][_tokenId] = AuctionNFT({
             nft: _nft,
             tokenId: _tokenId,
-            creator: msg.sender,
+            creator: payable(msg.sender),
             payToken: _payToken,
             initialPrice: _price,
             minBid: _minBid,
             startTime: _startTime,
             endTime: _endTime,
-            lastBidder: address(0),
+            lastBidder: payable(address(0)),
             heighestBid: _price,
             winner: address(0),
             success: false
@@ -448,7 +450,7 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
         address _nft,
         uint256 _tokenId,
         uint256 _bidPrice
-    ) external isAuction(_nft, _tokenId) {
+    ) external payable isAuction(_nft, _tokenId) {
         require(
             block.timestamp >= auctionNfts[_nft][_tokenId].startTime,
             'auction not start'
@@ -457,36 +459,42 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
             block.timestamp <= auctionNfts[_nft][_tokenId].endTime,
             'auction ended'
         );
+
+        AuctionNFT storage auction = auctionNfts[_nft][_tokenId];
+        uint256 bidPrice = auction.payToken == address(0)
+            ? msg.value
+            : _bidPrice;
         require(
-            _bidPrice >=
+            bidPrice >=
                 auctionNfts[_nft][_tokenId].heighestBid +
                     auctionNfts[_nft][_tokenId].minBid,
             'less than min bid price'
         );
 
-        AuctionNFT storage auction = auctionNfts[_nft][_tokenId];
-        IERC20 payToken = IERC20(auction.payToken);
-        payToken.transferFrom(msg.sender, address(this), _bidPrice);
+        if (auction.payToken == address(0)) {
+            payable(address(this)).transfer(bidPrice);
+        } else {
+            IERC20 payToken = IERC20(auction.payToken);
+            payToken.transferFrom(msg.sender, address(this), bidPrice);
+        }
 
         if (auction.lastBidder != address(0)) {
-            address lastBidder = auction.lastBidder;
-            uint256 lastBidPrice = auction.heighestBid;
-
             // Transfer back to last bidder
-            payToken.transfer(lastBidder, lastBidPrice);
+            if (auction.payToken == address(0)) {
+                auction.lastBidder.transfer(auction.heighestBid);
+            } else {
+                IERC20(auction.payToken).transfer(
+                    auction.lastBidder,
+                    auction.heighestBid
+                );
+            }
         }
 
         // Set new heighest bid price
-        auction.lastBidder = msg.sender;
-        auction.heighestBid = _bidPrice;
+        auction.lastBidder = payable(msg.sender);
+        auction.heighestBid = bidPrice;
 
-        emit PlacedBid(
-            _nft,
-            _tokenId,
-            auction.payToken,
-            _bidPrice,
-            payable(msg.sender)
-        );
+        emit PlacedBid(_nft, _tokenId, auction.payToken, bidPrice, msg.sender);
     }
 
     // @notice Result auction, can call by auction creator, heighest bidder, or marketplace owner only!
@@ -498,27 +506,30 @@ contract NFTMarketplace is Ownable, ReentrancyGuard {
                 msg.sender == auctionNfts[_nft][_tokenId].lastBidder,
             'not creator, winner, or owner'
         );
-        // require(
-        //     block.timestamp > auctionNfts[_nft][_tokenId].endTime,
-        //     'auction not ended'
-        // );
+        require(
+            block.timestamp > auctionNfts[_nft][_tokenId].endTime,
+            'auction not ended'
+        );
 
         AuctionNFT storage auction = auctionNfts[_nft][_tokenId];
-        IERC20 payToken = IERC20(auction.payToken);
         IERC721 nft = IERC721(auction.nft);
 
         auction.success = true;
         auction.winner = auction.creator;
 
-        uint256 heighestBid = auction.heighestBid;
-        uint256 totalPrice = heighestBid;
+        uint256 totalPrice = auction.heighestBid;
+        uint256 platformFeeTotal = calculatePlatformFee(auction.heighestBid);
 
         // Calculate & Transfer platfrom fee
-        uint256 platformFeeTotal = calculatePlatformFee(heighestBid);
-        payToken.transfer(feeRecipient, platformFeeTotal);
-
-        // Transfer to auction creator
-        payToken.transfer(auction.creator, totalPrice - platformFeeTotal);
+        if (auction.payToken == address(0)) {
+            feeRecipient.transfer(platformFeeTotal);
+            auction.creator.transfer(totalPrice - platformFeeTotal);
+        } else {
+            IERC20 payToken = IERC20(auction.payToken);
+            payToken.transfer(feeRecipient, platformFeeTotal);
+            // Transfer to auction creator
+            payToken.transfer(auction.creator, totalPrice - platformFeeTotal);
+        }
 
         // Transfer NFT to the winner
         nft.transferFrom(address(this), auction.lastBidder, auction.tokenId);

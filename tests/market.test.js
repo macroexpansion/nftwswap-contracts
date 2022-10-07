@@ -57,7 +57,7 @@ describe('Market', () => {
     })
 
     it('mint nft', async () => {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             const minted = await this.NFT.safeMint(this.seller.address, 'url')
             await minted.wait()
 
@@ -67,7 +67,7 @@ describe('Market', () => {
     })
 
     it('approve nft for market', async () => {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             const approved = await this.NFT.approve(this.Market.address, i)
             await approved.wait()
             const address = await this.NFT.getApproved(i)
@@ -143,7 +143,7 @@ describe('Market', () => {
             ethers.utils.parseEther('10'),
             ethers.utils.parseEther('10'),
             startTime,
-            startTime + 20
+            startTime + 100
         )
         await auction.wait()
     })
@@ -179,7 +179,7 @@ describe('Market', () => {
 
     it('list nft with native token', async () => {
         const market = await this.Market.connect(this.seller)
-        const listed = await this.Market.listItem(
+        const listed = await market.listItem(
             this.NFT.address,
             3,
             '0x0000000000000000000000000000000000000000',
@@ -214,15 +214,64 @@ describe('Market', () => {
         expect(numNft.toString()).to.equal('3')
     })
 
-    /* it('create auction with native token', async () => {
+    it('create auction with native token', async () => {
+        const startTime = Math.floor(Date.now() / 1000)
+        const market = await this.Market.connect(this.seller)
+        const auction = await market.createAuction(
+            this.NFT.address,
+            4,
+            '0x0000000000000000000000000000000000000000',
+            ethers.utils.parseEther('10'),
+            ethers.utils.parseEther('10'),
+            startTime,
+            startTime + 200
+        )
+        await auction.wait()
+    })
 
-	})
+    it('bid auction with native token', async () => {
+        const market = await this.Market.connect(this.buyer)
+        const bid = await market.bidAuction(
+            this.NFT.address,
+            4,
+            ethers.utils.parseEther('20'),
+            {
+                value: ethers.utils.parseEther('20'),
+            }
+        )
+        await bid.wait()
 
-	it('bid auction with native token', async () => {
+        const bal = await ethers.provider.getBalance(this.Market.address)
+        expect(bal.toString()).to.equal('20000000000000000000')
+    })
 
-	})
+    it('bid auction with native token 2', async () => {
+        const market = await this.Market.connect(this.signers[2])
+        const bid = await market.bidAuction(
+            this.NFT.address,
+            4,
+            ethers.utils.parseEther('0'),
+            {
+                value: ethers.utils.parseEther('80'),
+            }
+        )
+        await bid.wait()
 
-	it('result auction with native token', async () => {
+        const bal = await ethers.provider.getBalance(this.Market.address)
+        expect(bal.toString()).to.equal('80000000000000000000')
+    })
 
-	}) */
+    it('result auction with native token', async () => {
+        const before = await ethers.provider.getBalance(this.seller.address)
+
+        const market = await this.Market.connect(this.signers[2])
+        const won = await market.resultAuction(this.NFT.address, 4)
+        await won.wait()
+
+        const after = await ethers.provider.getBalance(this.seller.address)
+        expect(after - before + '').to.equal('80000000000000000000')
+
+        const numNft = await this.NFT.balanceOf(this.signers[2].address)
+        expect(numNft.toString()).to.equal('1')
+    })
 })
