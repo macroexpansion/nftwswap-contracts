@@ -1,6 +1,9 @@
 const { expect } = require('chai')
 const { ethers } = require('hardhat')
 
+const formatEther = ethers.utils.formatEther
+const parseEther = ethers.utils.parseEther
+
 const DAY = 60 * 60 * 24
 
 const UNLIMITED_ALLOWANCE =
@@ -15,6 +18,9 @@ describe('IDO', () => {
         this.tokenAbi =
             require('../artifacts/contracts/Token.sol/Token.json').abi
         this.idoAbi = require('../artifacts/contracts/IDO.sol/IDO.json').abi
+
+        this.buyer = this.signers[0]
+        this.ref = this.signers[1].address
     })
 
     it('deploy', async () => {
@@ -28,31 +34,30 @@ describe('IDO', () => {
         const idoDeploy = await this.IDO.deploy(
             tokenDeploy.address,
             busdDeploy.address,
-            this.signers[0].address,
-            currentTime - DAY * 3, // start buy time
-            currentTime + DAY * 5, // end buy time
-            currentTime + DAY * 0, // claim time
-            currentTime + DAY * 5, // cliff time
-            currentTime - 60 * 45 // listing time
+            this.buyer.address,
+            currentTime - DAY * 1, // start buy time
+            currentTime + DAY * 10, // end buy time
+            currentTime - DAY * 1, // claim time
+            currentTime - DAY * 1 // cliff time
         )
         await idoDeploy.deployed()
 
         this.token = new ethers.Contract(
             tokenDeploy.address,
             this.tokenAbi,
-            this.signers[0]
+            this.buyer
         )
 
         this.busd = new ethers.Contract(
             busdDeploy.address,
             this.tokenAbi,
-            this.signers[0]
+            this.buyer
         )
 
         this.ido = new ethers.Contract(
             idoDeploy.address,
             this.idoAbi,
-            this.signers[0]
+            this.buyer
         )
     })
 
@@ -63,7 +68,7 @@ describe('IDO', () => {
 
     it('approval', async () => {
         const allowance = await this.token.allowance(
-            this.signers[0].address,
+            this.buyer.address,
             this.ido.address
         )
         if (allowance.eq(ethers.BigNumber.from('0'))) {
@@ -75,7 +80,7 @@ describe('IDO', () => {
         }
 
         const busdAllowance = await this.busd.allowance(
-            this.signers[0].address,
+            this.buyer.address,
             this.ido.address
         )
         if (busdAllowance.eq(ethers.BigNumber.from('0'))) {
@@ -87,25 +92,27 @@ describe('IDO', () => {
         }
     })
 
-    /* it('sale', async () => {
+    it('sale', async () => {
         const total = await this.ido.totalSale()
         const current = await this.ido.currentSale()
         const progress = await this.ido.progress()
         console.log({
             totalSale: formatEther(total),
             currentSale: formatEther(current),
-            progress: formatEther(progress)
+            progress: formatEther(progress),
         })
-    }) */
+    })
 
-    /* it('buy', async () => {
+    it('buy', async () => {
         for (let i = 0; i < 2; i++) {
-            let bought = await this.ido.buy(parseEther('300'))
+            let bought = await this.ido.buy(parseEther('500'), this.ref)
             await bought.wait()
         }
 
-        const busdBalance = await this.busd.balanceOf(this.signers[0].address)
-        const user = await this.ido.userByAddress(this.signers[0].address)
+        const busdBalance = await this.busd.balanceOf(this.buyer.address)
+        const user = await this.ido.userByAddress(this.buyer.address)
+        const refs = await this.ido.getRefs()
+        const refCount = await this.ido.refCount(refs[0])
         console.log({
             busdBalance: formatEther(busdBalance),
             buyAmount: formatEther(user.buyAmount),
@@ -113,21 +120,30 @@ describe('IDO', () => {
             initVestingDebt: formatEther(user.initVestingDebt),
             dailyVestingAmount: formatEther(user.dailyVestingAmount),
             dailyVestingDebt: formatEther(user.dailyVestingDebt),
+            refs,
+            refCount: refCount.toString(),
         })
-    }) */
+    })
 
-    /* it('getVestingAmount', async () => {
+    it('getVestingAmount', async () => {
         const idoAmount = await this.ido.getVestingAmount()
         console.log(formatEther(idoAmount))
-    }) */
+    })
 
-    /* it('claim', async () => {
+    it('claim', async () => {
+        const transfered = await this.token.transfer(
+            this.ido.address,
+            parseEther('1000000')
+        )
+        await transfered.wait()
+        const balance = await this.token.balanceOf(this.ido.address)
+
         const claimed = await this.ido.claim()
         await claimed.wait()
-        
-        const busdBalance = await this.busd.balanceOf(this.signers[0].address)
-        const tokenBalance = await this.token.balanceOf(this.signers[0].address)
-        const user = await this.ido.userByAddress(this.signers[0].address)
+
+        const busdBalance = await this.busd.balanceOf(this.buyer.address)
+        const tokenBalance = await this.token.balanceOf(this.buyer.address)
+        const user = await this.ido.userByAddress(this.buyer.address)
         console.log({
             busdBalance: formatEther(busdBalance),
             tokenBalance: formatEther(tokenBalance),
@@ -137,16 +153,16 @@ describe('IDO', () => {
             dailyVestingAmount: formatEther(user.dailyVestingAmount),
             dailyVestingDebt: formatEther(user.dailyVestingDebt),
         })
-    }) */
+    })
 
-    /* it('sale', async () => {
+    it('sale', async () => {
         const total = await this.ido.totalSale()
         const current = await this.ido.currentSale()
         const progress = await this.ido.progress()
         console.log({
             totalSale: formatEther(total),
             currentSale: formatEther(current),
-            progress: formatEther(progress)
+            progress: formatEther(progress),
         })
-    }) */
+    })
 })

@@ -14,23 +14,24 @@ contract IDO is Ownable {
     IERC20 public busd;
 
     address public dev;
+    address[] public refs;
+    mapping(address => uint256) public refCount;
 
     uint256 public startBuyTime;
     uint256 public endBuyTime;
     uint256 public claimTime;
     uint256 public cliffTime;
-    uint256 public listingTime;
 
-    uint256 public initVestingPercent = 15;
-    uint256 public ipoPrice = 8e15; // 0.008
+    uint256 public initVestingPercent = 55; // 55%
+    uint256 public ipoPrice = 2e16; // 0.02
     uint256 public immutable VESTING_WINDOW = 1 days; // 1 day in seconds
-    uint256 public immutable VESTING_DURATION = 183; // 183 days
-    uint256 public dailyVestingPercent = 546448087431694; // 0.546448087431694 percent
+    uint256 public immutable VESTING_DURATION = 90; // 90 days
+    uint256 public dailyVestingPercent = 1111111111111112; // 0.546448087431694 percent
 
-    uint256 public totalSale = 180000 ether;
+    uint256 public totalSale = 300000 ether;
     uint256 public currentSale = 0 ether;
-    uint256 public maxBuyAmount = 900 ether;
-    uint256 public minBuyAmount = 300 ether;
+    uint256 public maxBuyAmount = 1000 ether;
+    uint256 public minBuyAmount = 100 ether;
 
     struct User {
         uint256 buyAmount;
@@ -49,8 +50,7 @@ contract IDO is Ownable {
         uint256 _startBuyTime,
         uint256 _endBuyTime,
         uint256 _claimTime,
-        uint256 _cliffTime,
-        uint256 _listingTime
+        uint256 _cliffTime
     ) {
         token = IERC20(_token);
         busd = IERC20(_busd);
@@ -61,9 +61,12 @@ contract IDO is Ownable {
         endBuyTime = _endBuyTime;
         claimTime = _claimTime;
         cliffTime = _cliffTime;
-        listingTime = _listingTime;
 
         require(claimTime <= cliffTime, 'init error');
+    }
+
+    function getRefs() external view returns (address[] memory) {
+        return refs;
     }
 
     function refund(address _user) external onlyOwner {
@@ -104,7 +107,7 @@ contract IDO is Ownable {
 
     event Buy(address buyer, uint256 amount, uint256 timestamp);
 
-    function buy(uint256 buyAmount) external {
+    function buy(uint256 buyAmount, address ref) external {
         require(block.timestamp >= startBuyTime, 'buy: not open');
         require(block.timestamp <= endBuyTime, 'buy: buy time expired');
         require(
@@ -115,12 +118,20 @@ contract IDO is Ownable {
             currentSale + buyAmount <= totalSale,
             'buy: exceeds total sale'
         );
+        require(msg.sender != ref, 'buy: you can not ref yourself');
 
         User storage user = userByAddress[msg.sender];
         require(
             user.buyAmount + buyAmount <= maxBuyAmount,
             'buy: max amount exceeds'
         );
+
+        if (refCount[ref] == 0) {
+            refs.push(ref);
+        }
+        if (user.buyAmount == 0) {
+            refCount[ref] += 1;
+        }
 
         busd.safeTransferFrom(msg.sender, dev, buyAmount);
         currentSale += buyAmount;
