@@ -1,7 +1,7 @@
 const { ethers, network } = require('hardhat')
 const fs = require('fs')
 
-const DAY = 60 * 60 * 24
+const DAY = 60 * 60 * 24 * 1000
 
 const deploy = async () => {
     let fo = JSON.parse(fs.readFileSync(`${network.name}_address.json`))
