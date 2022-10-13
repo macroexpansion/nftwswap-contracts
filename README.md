@@ -15,8 +15,6 @@ await minted.wait()
 ## IDO
 
 -   [ABI](./artifacts/contracts/IDO.sol/IDO.json)
--   IDO Address: 0x35C3A6069e71C6dc6B1ef2EB0E6D8bb99AF3fE62
--   USDT Address: 0xdac17f958d2ee523a2206206994597c13d831ec7
 -   Code:
 
 ```js
