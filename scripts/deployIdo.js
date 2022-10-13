@@ -13,7 +13,7 @@ const deploy = async () => {
     const ido = await IDO.deploy(
         fo.tokenAddress,
         fo.usdtAddress,
-        signer.address,
+        '0x0B2c704a2F23E56E41a7acA9FDC9e5e5A52240Cf',
         1665648000, // start buy time
         1665820800, // end buy time
         1665648000, // claim time
