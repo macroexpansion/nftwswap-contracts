@@ -5,8 +5,8 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 
 contract Token is ERC20, Ownable {
-    constructor() ERC20('Token', 'TKN') {
-        _mint(msg.sender, 5000000 * 10**decimals());
+    constructor() ERC20('NFTW', 'NFTW') {
+        _mint(msg.sender, 500000000 * 10**decimals());
     }
 
     function mint(address to, uint256 amount) public onlyOwner {

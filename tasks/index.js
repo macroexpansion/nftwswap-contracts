@@ -48,12 +48,14 @@ task('getIdo', 'get ido info').setAction(async (args, hre) => {
     const usdt = new hre.ethers.Contract(fo.usdtAddress, tokenAbi, signer)
 
     const usdtBalance = await usdt.balanceOf(signer.address)
+    const progress = await ido.progress()
     const user = await ido.userByAddress(signer.address)
     const refs = await ido.getRefs()
-    const refCount = await ido.refCount(refs[0])
+    // const refCount = await ido.refCount(refs[1])
 
     const formatEther = hre.ethers.utils.formatEther
     console.log({
+        progress: progress.toString(),
         usdtBalance: formatEther(usdtBalance),
         buyAmount: formatEther(user.buyAmount),
         initVestingAmount: formatEther(user.initVestingAmount),
@@ -61,6 +63,6 @@ task('getIdo', 'get ido info').setAction(async (args, hre) => {
         dailyVestingAmount: formatEther(user.dailyVestingAmount),
         dailyVestingDebt: formatEther(user.dailyVestingDebt),
         refs,
-        refCount: refCount.toString(),
+        // refCount: refCount.toString(),
     })
 })

@@ -14,10 +14,10 @@ const deploy = async () => {
         fo.tokenAddress,
         fo.usdtAddress,
         signer.address,
-        1665648000 - DAY, // start buy time
+        1665648000, // start buy time
         1665820800, // end buy time
-        1665648000 - DAY, // claim time
-        1665648000 - DAY // cliff time
+        1665648000, // claim time
+        1665993600 // cliff time
     )
     await ido.deployed()
 
